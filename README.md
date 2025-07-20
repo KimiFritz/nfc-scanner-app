@@ -27,3 +27,6 @@ Dieses Repository enthält die im 6. Semester des Moduls „Fallstudie“ an der
 - [Share](https://capacitorjs.com/docs/apis/share)
 - [Clipboard](https://capacitorjs.com/docs/apis/clipboard)
 - [NFC](https://capawesome.io/plugins/nfc/)
+
+**Präsentation**
+- [Google Slides](https://docs.google.com/presentation/d/1z23PDzNpM6THnzU-YDDMBi3YsSlLxQEGWBM_lDag4Qw/edit?usp=sharing)
