@@ -30,3 +30,6 @@ Dieses Repository enthält die im 6. Semester des Moduls „Fallstudie“ an der
 
 **Präsentation**
 - [Google Slides](https://docs.google.com/presentation/d/1z23PDzNpM6THnzU-YDDMBi3YsSlLxQEGWBM_lDag4Qw/edit?usp=sharing)
+
+**Fragen:**
+- Sprache: Deutsch oder Englisch?
