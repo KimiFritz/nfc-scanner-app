@@ -2,30 +2,37 @@
   <ion-page>
     <ion-header :translucent="true">
       <ion-toolbar>
-        <ion-title>Blank</ion-title>
+        <ion-title>NFC-Scanner-App</ion-title>
       </ion-toolbar>
     </ion-header>
 
     <ion-content :fullscreen="true">
       <ion-header collapse="condense">
         <ion-toolbar>
-          <ion-title size="large">Blank</ion-title>
+          <ion-title size="large">NFC-Scanner-App</ion-title>
         </ion-toolbar>
       </ion-header>
 
-      <div id="container">
-        <strong>Ready to create an app?</strong>
-        <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
-      </div>
+      <!-- Buttons to read and write NFC tags -->
+      <ion-button expand="block" @click="readNfc">Read</ion-button>
+      <ion-button expand="block" @click="writeNfc">Write</ion-button>
+      
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/vue';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton } from '@ionic/vue';
+
+const readNfc = () => {
+};
+
+const writeNfc = () => {
+};
 </script>
 
 <style scoped>
+
 #container {
   text-align: center;
   
@@ -54,3 +61,5 @@ import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/vue
   text-decoration: none;
 }
 </style>
+
+
