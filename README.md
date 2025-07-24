@@ -33,3 +33,4 @@ Dieses Repository enthält die im 6. Semester des Moduls „Fallstudie“ an der
 
 **Fragen:**
 - Sprache: Deutsch oder Englisch?
+- Wann sollen die benötigten Berechtigungen angefordert werden? Beim Start der App oder erst beim Klicken der Buttons?
