@@ -43,7 +43,7 @@
 
 <script setup lang="ts">
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton } from '@ionic/vue';
-import { Nfc } from '@capawesome-team/capacitor-nfc';
+import { Nfc, NfcUtils, NfcTagTechType} from '@capawesome-team/capacitor-nfc';
 import { alertController } from '@ionic/vue';
 import { Capacitor } from '@capacitor/core';
 import { onMounted, ref } from 'vue';
@@ -273,11 +273,98 @@ const readNfc = async () => {
   }
 };
 
-const writeNfc = () => {
-  console.log('Write NFC Tag - NFC ist bereit!');
-  // Hier würde die eigentliche Write-Logik implementiert werden
+const write = async (text: string) => {
+  const utils = new NfcUtils();
+  const { record } = utils.createNdefTextRecord({ text });
+
+  return new Promise<void>(async (resolve, reject) => {
+    let cancelled = false;
+
+    const writingAlert = await alertController.create({
+      header: 'Warte auf NFC-Tag...',
+      message: 'Halte das NFC-Tag an das Gerät, um den Text zu schreiben.',
+      buttons: [
+        {
+          text: 'Abbrechen',
+          role: 'cancel',
+          handler: async () => {
+            cancelled = true;
+            await Nfc.stopScanSession();
+            resolve();
+          }
+        }
+      ],
+      backdropDismiss: false,
+    });
+    await writingAlert.present();
+
+    await Nfc.removeAllListeners();
+
+    const listener = await Nfc.addListener('nfcTagScanned', async () => {
+      if (cancelled) return;
+
+      try {
+        await Nfc.write({ message: { records: [record] } });
+        await Nfc.stopScanSession();
+        await writingAlert.dismiss();
+
+        const successAlert = await alertController.create({
+          header: 'Erfolg',
+          message: 'Der Text wurde auf das NFC-Tag geschrieben.',
+          buttons: ['OK']
+        });
+        await successAlert.present();
+
+        resolve();
+      } catch (error) {
+        await writingAlert.dismiss();
+
+        const errorAlert = await alertController.create({
+          header: 'Fehler',
+          message: 'Fehler beim Schreiben auf das NFC-Tag.',
+          buttons: ['OK']
+        });
+        await errorAlert.present();
+
+        reject(error);
+      }
+    });
+
+    await Nfc.startScanSession({ alertMessage: 'Halte das NFC-Tag zum Schreiben an das Gerät.' });
+  });
+};
+
+const writeNfc = async () => {
+  const alert = await alertController.create({
+    header: 'NFC-Tag beschreiben',
+    message: 'Bitte gib den Text ein, der auf das NFC-Tag geschrieben werden soll:',
+    inputs: [
+      {
+        name: 'nfcText',
+        type: 'text',
+        placeholder: 'Text für NFC-Tag',
+      }
+    ],
+    buttons: [
+      {
+        text: 'Abbrechen',
+        role: 'cancel',
+      },
+      {
+        text: 'OK',
+        handler: async (data: { nfcText: string }) => {
+          if (data.nfcText && data.nfcText.trim().length > 0) {
+            // Kleiner Delay, damit der Alert sauber schließt
+            setTimeout(() => write(data.nfcText), 300);
+          }
+        }
+      }
+    ]
+  });
+  await alert.present();
 };
 </script>
+
 
 <style scoped>
 #status-container {
