@@ -5,12 +5,12 @@ Dieses Repository enthält die im 6. Semester des Moduls „Fallstudie“ an der
 **Aufgabenstellung:** Ihre Aufgabe ist das Erstellen einer Android- oder iOS-App zum Lesen und Schreiben von NFC-Tags.
 
 **Anforderungen:**  
-- [ ]  Die App unterstützt mindestens eine der beiden Plattformen Android oder iOS.
+- [X]  Die App unterstützt mindestens eine der beiden Plattformen Android oder iOS. &rarr; Android
 - [ ]  Alle benötigten Berechtigungen müssen von der App angefordert werden.
 - [ ]  Falls NFC im Gerät deaktiviert ist, muss ein Hinweis eingeblendet werden.
 - [ ]  Während ein Lese- oder Schreibvorgang stattfindet, muss ein Hinweis mit einem “Abbrechen”-Button eingeblendet werden, sodass der Vorgang gestoppt werden kann.
-- [ ]  Die Übersichtsseite besitzt einen Button, über den der Lesevorgang gestartet wird.
-- [ ]  Die Übersichtsseite besitzt einen Button, über den der Schreibvorgang gestartet wird.
+- [X]  Die Übersichtsseite besitzt einen Button, über den der Lesevorgang gestartet wird.
+- [X]  Die Übersichtsseite besitzt einen Button, über den der Schreibvorgang gestartet wird.
 - [ ]  Es können beliebige Textinhalte in Form eines NDEF-Records auf einen NFC-Tag geschrieben werden.
 - [ ]  Nach dem Lesen eines NFC-Tags werden folgende Informationen des NFC-Tags auf einer Detailseite angezeigt: `id`, `payload` und `isWritable`. `payload` ist der Wert des ersten NDEF-Records des NFC-Tags, falls vorhanden.
 - [ ]  Auf der Detailseite kann die `payload` des NFC-Tags in die Zwischenablage kopiert werden.
@@ -29,8 +29,6 @@ Dieses Repository enthält die im 6. Semester des Moduls „Fallstudie“ an der
 - [NFC](https://capawesome.io/plugins/nfc/)
 
 **Präsentation**
-- [Google Slides](https://docs.google.com/presentation/d/1z23PDzNpM6THnzU-YDDMBi3YsSlLxQEGWBM_lDag4Qw/edit?usp=sharing)
+- [PowerPoint]()
 
-**Fragen:**
-- Sprache: Deutsch oder Englisch?
-- Wann sollen die benötigten Berechtigungen angefordert werden? Beim Start der App oder erst beim Klicken der Buttons?
+
