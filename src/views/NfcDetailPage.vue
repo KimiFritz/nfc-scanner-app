@@ -24,7 +24,7 @@
           </ion-card-header>
           <ion-card-content>
             <p class="detail-value">{{ tagData.id }}</p>
-            <p class="detail-bytes">Bytes: {{ tagData.idHex }}</p>
+            <p class="detail-bytes" v-if="tagData.idHex">Hex: {{ tagData.idHex }}</p>
           </ion-card-content>
         </ion-card>
 
@@ -36,7 +36,7 @@
           <ion-card-content>
             <p class="detail-value" v-if="tagData.payload">{{ tagData.payload }}</p>
             <p class="detail-empty" v-else>Kein Payload verfügbar</p>
-            <p class="detail-bytes" v-if="tagData.payloadHex">Bytes: {{ tagData.payloadHex }}</p>
+            <p class="detail-bytes" v-if="tagData.payloadHex">Hex: {{ tagData.payloadHex }}</p>
             
             <!-- Aktions-Buttons für Payload -->
             <div class="action-buttons" v-if="tagData.payload">
@@ -52,15 +52,14 @@
           </ion-card-content>
         </ion-card>
 
-        <!-- Tag-Eigenschaften -->
+        <!-- Beschreibbar -->
         <ion-card>
           <ion-card-header>
-            <ion-card-title>Tag-Eigenschaften</ion-card-title>
+            <ion-card-title>Beschreibbar</ion-card-title>
           </ion-card-header>
           <ion-card-content>
             <ion-item lines="none">
               <ion-label>
-                <h3>Beschreibbar</h3>
                 <p>{{ tagData.isWritable ? 'Ja' : 'Nein' }}</p>
               </ion-label>
               <ion-icon 
@@ -69,38 +68,17 @@
                 :color="tagData.isWritable ? 'success' : 'danger'"
               ></ion-icon>
             </ion-item>
-            
-            <ion-item lines="none" v-if="tagData.type !== 'Unbekannt'">
-              <ion-label>
-                <h3>Tag-Typ</h3>
-                <p>{{ tagData.type }}</p>
-              </ion-label>
-            </ion-item>
-            
-            <ion-item lines="none" v-if="tagData.maxSize > 0">
-              <ion-label>
-                <h3>Maximale Größe</h3>
-                <p>{{ tagData.maxSize }} Bytes</p>
-              </ion-label>
-            </ion-item>
-            
-            <ion-item lines="none" v-if="tagData.techTypes.length > 0">
-              <ion-label>
-                <h3>Technologien</h3>
-                <p>{{ tagData.techTypes.join(', ') }}</p>
-              </ion-label>
-            </ion-item>
           </ion-card-content>
         </ion-card>
 
-        <!-- Hex-Dump -->
-        <ion-card v-if="tagData.allBytes.length > 0">
+        <!-- Bytes in Hexadezimal -->
+        <ion-card v-if="tagData.allBytesHex">
           <ion-card-header>
-            <ion-card-title>Hex-Dump</ion-card-title>
+            <ion-card-title>Alle Bytes (Hexadezimal)</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <div class="hex-dump">
-              <pre>{{ formatHexDump(tagData.allBytes) }}</pre>
+            <div class="hex-display">
+              <p class="hex-bytes">{{ tagData.allBytesHex }}</p>
             </div>
           </ion-card-content>
         </ion-card>
@@ -118,6 +96,7 @@ import {
 import { copyOutline, shareOutline, checkmarkCircle, closeCircle } from 'ionicons/icons';
 import { Clipboard } from '@capacitor/clipboard';
 import { Share } from '@capacitor/share';
+import { NfcUtils } from '@capawesome-team/capacitor-nfc';
 import { useRoute } from 'vue-router';
 import { onMounted, ref } from 'vue';
 
@@ -130,12 +109,9 @@ interface TagData {
   isWritable: boolean;
   idBytes: number[];
   payloadBytes: number[];
-  techTypes: string[];
-  maxSize: number;
-  type: string;
   idHex: string;
   payloadHex: string;
-  allBytes: number[];
+  allBytesHex: string;
 }
 
 const tagData = ref<TagData>({
@@ -144,60 +120,50 @@ const tagData = ref<TagData>({
   isWritable: false,
   idBytes: [],
   payloadBytes: [],
-  techTypes: [],
-  maxSize: 0,
-  type: '',
   idHex: '',
   payloadHex: '',
-  allBytes: []
+  allBytesHex: ''
 });
-
-// Hilfsfunktionen
-const bytesToHex = (bytes: number[]): string => {
-  return bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-};
-
-const formatHexDump = (bytes: number[]): string => {
-  let result = '';
-  for (let i = 0; i < bytes.length; i += 16) {
-    const chunk = bytes.slice(i, i + 16);
-    const address = i.toString(16).padStart(8, '0').toUpperCase();
-    const hex = chunk.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase().padEnd(47, ' ');
-    const ascii = chunk.map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.').join('');
-    
-    result += `${address}  ${hex}  |${ascii}|\n`;
-  }
-  return result;
-};
 
 // Route-Parameter verarbeiten
 onMounted(() => {
   try {
+    const utils = new NfcUtils();
+    
     tagData.value = {
       id: route.params.id as string || 'Unbekannt',
       payload: decodeURIComponent(route.params.payload as string || ''),
       isWritable: route.params.isWritable === 'true',
       idBytes: JSON.parse(route.params.idBytes as string || '[]'),
       payloadBytes: JSON.parse(route.params.payloadBytes as string || '[]'),
-      techTypes: JSON.parse(route.params.techTypes as string || '[]'),
-      maxSize: parseInt(route.params.maxSize as string || '0'),
-      type: route.params.type as string || 'Unbekannt',
       idHex: '',
       payloadHex: '',
-      allBytes: []
+      allBytesHex: ''
     };
 
-    // Hex-Darstellungen generieren
+    // Hex-Darstellungen mit NfcUtils generieren
     if (tagData.value.idBytes.length > 0) {
-      tagData.value.idHex = bytesToHex(tagData.value.idBytes);
+      tagData.value.idHex = utils.convertBytesToHex({ 
+        bytes: tagData.value.idBytes, 
+        separator: ' ' 
+      }).hex;
     }
     
     if (tagData.value.payloadBytes.length > 0) {
-      tagData.value.payloadHex = bytesToHex(tagData.value.payloadBytes);
+      tagData.value.payloadHex = utils.convertBytesToHex({ 
+        bytes: tagData.value.payloadBytes, 
+        separator: ' ' 
+      }).hex;
     }
 
-    // Alle Bytes für Hex-Dump kombinieren
-    tagData.value.allBytes = [...tagData.value.idBytes, ...tagData.value.payloadBytes];
+    // Alle Bytes für Hex-Anzeige kombinieren
+    const allBytes = [...tagData.value.idBytes, ...tagData.value.payloadBytes];
+    if (allBytes.length > 0) {
+      tagData.value.allBytesHex = utils.convertBytesToHex({ 
+        bytes: allBytes, 
+        separator: ' ' 
+      }).hex;
+    }
 
   } catch (error) {
     console.error('Fehler beim Verarbeiten der Tag-Daten:', error);
@@ -288,19 +254,19 @@ const sharePayload = async () => {
   flex-wrap: wrap;
 }
 
-.hex-dump {
+.hex-display {
   background-color: var(--ion-color-light);
   border-radius: 4px;
   padding: 12px;
   overflow-x: auto;
 }
 
-.hex-dump pre {
+.hex-bytes {
   font-family: 'Courier New', monospace;
   font-size: 12px;
   line-height: 1.4;
   margin: 0;
-  white-space: pre;
+  word-break: break-all;
   color: var(--ion-color-dark);
 }
 

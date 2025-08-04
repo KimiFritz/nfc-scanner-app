@@ -15,9 +15,18 @@
 
       <!-- NFC Status Anzeige -->
       <div id="status-container">
-        <p :class="['status-message', `status-${nfcStatus}`]">
-          {{ statusMessage }}
-        </p>
+        <div :class="['status-card', `status-${nfcStatus}`]">
+          <ion-icon 
+            :icon="getStatusIcon()" 
+            :class="['status-icon', `status-icon-${nfcStatus}`]"
+          ></ion-icon>
+          <p class="status-message">{{ statusMessage }}</p>
+        </div>
+      </div>
+
+      <!-- NFC Icon in der Mitte -->
+      <div id="nfc-icon-container">
+        <ion-icon :icon="radioOutline" class="nfc-main-icon"></ion-icon>
       </div>
 
       <!-- Buttons to read and write NFC tags -->
@@ -27,14 +36,16 @@
           @click="readNfc"
           :disabled="!isNfcReady"
         >
-          Read NFC Tag
+          <ion-icon :icon="scanOutline" slot="start"></ion-icon>
+          Lesen
         </ion-button>
         <ion-button 
           expand="block" 
           @click="writeNfc"
           :disabled="!isNfcReady"
         >
-          Write NFC Tag
+          <ion-icon :icon="createOutline" slot="start"></ion-icon>
+          Schreiben
         </ion-button>
       </div>
     </ion-content>
@@ -42,8 +53,9 @@
 </template>
 
 <script setup lang="ts">
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton } from '@ionic/vue';
-import { Nfc, NfcUtils, NfcTagTechType} from '@capawesome-team/capacitor-nfc';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonIcon } from '@ionic/vue';
+import { scanOutline, createOutline, radioOutline, checkmarkCircleOutline, alertCircleOutline, timeOutline, settingsOutline } from 'ionicons/icons';
+import { Nfc, NfcUtils } from '@capawesome-team/capacitor-nfc';
 import { alertController } from '@ionic/vue';
 import { Capacitor } from '@capacitor/core';
 import { onMounted, ref } from 'vue';
@@ -53,15 +65,25 @@ const router = useRouter();
 
 // Reactive state für NFC-Status
 const nfcStatus = ref<'checking' | 'ready' | 'error'>('checking');
-const statusMessage = ref('NFC wird initialisiert...');
+const statusMessage = ref('NFC wird geprüft...');
 const isNfcReady = ref(false);
 
-// App-Start: Vollständige NFC-Initialisierung
+// Status Icon bestimmen
+const getStatusIcon = () => {
+  switch (nfcStatus.value) {
+    case 'checking': return timeOutline;
+    case 'ready': return checkmarkCircleOutline;
+    case 'error': return alertCircleOutline;
+    default: return timeOutline;
+  }
+};
+
+// App-Start: Nur grundlegende NFC-Verfügbarkeit prüfen
 onMounted(async () => {
-  await initializeNfc();
+  await checkNfcAvailability();
 });
 
-const initializeNfc = async () => {
+const checkNfcAvailability = async () => {
   try {
     nfcStatus.value = 'checking';
     statusMessage.value = 'NFC wird geprüft...';
@@ -70,8 +92,7 @@ const initializeNfc = async () => {
     const { isSupported } = await Nfc.isSupported();
     if (!isSupported) {
       nfcStatus.value = 'error';
-      statusMessage.value = '❌ NFC wird von diesem Gerät nicht unterstützt';
-      await showErrorDialog('NFC nicht verfügbar', 'Diese App benötigt NFC-Unterstützung.');
+      statusMessage.value = 'NFC wird nicht unterstützt';
       return;
     }
 
@@ -80,51 +101,85 @@ const initializeNfc = async () => {
       const { isEnabled } = await Nfc.isEnabled();
       if (!isEnabled) {
         nfcStatus.value = 'error';
-        statusMessage.value = '📱 NFC ist deaktiviert';
-        await promptNfcActivation();
+        statusMessage.value = 'NFC ist deaktiviert';
+        await showNfcDeactivationDialog();
         return;
       }
     }
 
-    // 3. Berechtigungen prüfen und anfordern
-    statusMessage.value = 'Berechtigungen werden geprüft...';
-    const { nfc } = await Nfc.checkPermissions();
-    
-    if (nfc !== 'granted') {
-      statusMessage.value = 'Berechtigung wird angefordert...';
-      const { nfc: requestedPermission } = await Nfc.requestPermissions();
-      
-      if (requestedPermission !== 'granted') {
-        nfcStatus.value = 'error';
-        statusMessage.value = '❌ NFC-Berechtigung verweigert';
-        await showErrorDialog('Berechtigung erforderlich', 'Diese App benötigt NFC-Berechtigung.');
-        return;
-      }
-    }
-
-    // 4. Erfolgreich - App ist bereit
+    // 3. NFC ist verfügbar und aktiviert
     nfcStatus.value = 'ready';
-    statusMessage.value = '✅ NFC ist bereit';
+    statusMessage.value = 'NFC ist bereit';
     isNfcReady.value = true;
 
   } catch (error) {
-    console.error('Fehler bei NFC-Initialisierung:', error);
+    console.error('Fehler bei NFC-Prüfung:', error);
     nfcStatus.value = 'error';
-    statusMessage.value = '❌ Fehler bei der NFC-Initialisierung';
-    await showErrorDialog('Initialisierungsfehler', `Fehler: ${(error as Error).message}`);
+    statusMessage.value = 'Fehler bei der NFC-Prüfung';
   }
 };
 
-const promptNfcActivation = async () => {
+const showNfcDeactivationDialog = async () => {
   const alert = await alertController.create({
     header: 'NFC aktivieren',
-    message: 'NFC ist deaktiviert. Bitte aktivieren Sie NFC in den Einstellungen.',
+    message: 'NFC ist auf diesem Gerät deaktiviert. Bitte aktivieren Sie NFC in den Einstellungen, um die App verwenden zu können.',
+    buttons: [
+      { 
+        text: 'Abbrechen', 
+        role: 'cancel',
+        handler: () => {
+          nfcStatus.value = 'error';
+          statusMessage.value = 'NFC ist deaktiviert';
+        }
+      },
+      { 
+        text: 'Einstellungen öffnen', 
+        handler: async () => {
+          await Nfc.openSettings();
+          // Nach dem Öffnen der Einstellungen erneut prüfen
+          setTimeout(() => checkNfcAvailability(), 1000);
+        }
+      }
+    ]
+  });
+  await alert.present();
+};
+
+const checkPermissionsAndRequest = async (): Promise<boolean> => {
+  try {
+    // Berechtigungen prüfen
+    const { nfc } = await Nfc.checkPermissions();
+    
+    if (nfc !== 'granted') {
+      // Berechtigung anfordern
+      const { nfc: requestedPermission } = await Nfc.requestPermissions();
+      
+      if (requestedPermission !== 'granted') {
+        await showPermissionDialog();
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Fehler bei Berechtigungsprüfung:', error);
+    await showErrorDialog('Berechtigungsfehler', `Fehler: ${(error as Error).message}`);
+    return false;
+  }
+};
+
+const showPermissionDialog = async () => {
+  const alert = await alertController.create({
+    header: 'NFC-Berechtigung erforderlich',
+    message: 'Diese App benötigt NFC-Berechtigung zum Lesen und Schreiben von Tags.',
     buttons: [
       { text: 'Abbrechen', role: 'cancel' },
       { 
         text: 'Einstellungen öffnen', 
         handler: async () => {
-          await Nfc.openSettings();
+          if (Capacitor.getPlatform() === 'android') {
+            await Nfc.openSettings();
+          }
         }
       }
     ]
@@ -136,29 +191,17 @@ const showErrorDialog = async (header: string, message: string) => {
   const alert = await alertController.create({
     header,
     message,
-    buttons: [
-      { text: 'Erneut versuchen', handler: () => initializeNfc() },
-      { text: 'OK', role: 'cancel' }
-    ]
+    buttons: ['OK']
   });
   await alert.present();
 };
 
-// Hilfsfunktionen für NFC-Datenkonvertierung
-const bytesToHex = (bytes: number[]): string => {
-  return bytes.map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-};
-
-const bytesToString = (bytes: number[]): string => {
-  try {
-    return new TextDecoder('utf-8').decode(new Uint8Array(bytes));
-  } catch {
-    return bytesToHex(bytes); // Fallback to hex if not valid UTF-8
-  }
-};
-
-// NFC-Lesefunktion mit Alert-Dialog
+// NFC-Lesefunktion mit Berechtigungsprüfung
 const readNfc = async () => {
+  // Erst Berechtigungen prüfen
+  const hasPermission = await checkPermissionsAndRequest();
+  if (!hasPermission) return;
+
   let scanAlert: any = null;
   let tagListener: any = null;
   let errorListener: any = null;
@@ -202,25 +245,36 @@ const readNfc = async () => {
       await cleanup();
 
       const tag = event.nfcTag;
+      const utils = new NfcUtils();
       
       // Tag-Daten extrahieren
       const tagData = {
-        id: tag.id ? bytesToHex(tag.id) : 'Unbekannt',
+        id: tag.id ? utils.convertBytesToHex({ bytes: tag.id }).hex : 'Unbekannt',
         idBytes: tag.id || [],
         payload: '',
         payloadBytes: [] as number[],
-        isWritable: tag.isWritable || false,
-        techTypes: tag.techTypes || [],
-        maxSize: tag.maxSize || 0,
-        type: tag.type || 'Unbekannt'
+        isWritable: tag.isWritable || false
       };
 
-      // Payload aus NDEF-Records extrahieren
+      // Payload aus NDEF-Records extrahieren (nur Text-Records)
       if (tag.message?.records && tag.message.records.length > 0) {
         const firstRecord = tag.message.records[0];
         if (firstRecord.payload) {
           tagData.payloadBytes = firstRecord.payload;
-          tagData.payload = bytesToString(firstRecord.payload);
+          
+          // Versuche Text aus NDEF Text Record zu extrahieren
+          try {
+            const { text } = utils.getTextFromNdefTextRecord({ record: firstRecord });
+            if (text) {
+              tagData.payload = text;
+            } else {
+              // Fallback: Bytes als String interpretieren
+              tagData.payload = utils.convertBytesToString({ bytes: firstRecord.payload }).text;
+            }
+          } catch {
+            // Fallback: Bytes als String interpretieren
+            tagData.payload = utils.convertBytesToString({ bytes: firstRecord.payload }).text;
+          }
         }
       }
 
@@ -232,10 +286,7 @@ const readNfc = async () => {
           payload: encodeURIComponent(tagData.payload),
           isWritable: tagData.isWritable.toString(),
           idBytes: JSON.stringify(tagData.idBytes),
-          payloadBytes: JSON.stringify(tagData.payloadBytes),
-          techTypes: JSON.stringify(tagData.techTypes),
-          maxSize: tagData.maxSize.toString(),
-          type: tagData.type
+          payloadBytes: JSON.stringify(tagData.payloadBytes)
         }
       });
     });
@@ -335,6 +386,10 @@ const write = async (text: string) => {
 };
 
 const writeNfc = async () => {
+  // Erst Berechtigungen prüfen
+  const hasPermission = await checkPermissionsAndRequest();
+  if (!hasPermission) return;
+
   const alert = await alertController.create({
     header: 'NFC-Tag beschreiben',
     message: 'Bitte gib den Text ein, der auf das NFC-Tag geschrieben werden soll:',
@@ -369,17 +424,43 @@ const writeNfc = async () => {
 <style scoped>
 #status-container {
   text-align: center;
-  padding: 20px;
+  padding: 16px;
   margin-top: 20px;
 }
 
+.status-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.status-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.status-icon-checking {
+  color: #1565c0;
+}
+
+.status-icon-ready {
+  color: #2e7d32;
+}
+
+.status-icon-error {
+  color: #d32f2f;
+}
+
 .status-message {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
   margin: 0;
-  padding: 12px 20px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  text-align: center;
 }
 
 .status-checking {
@@ -389,24 +470,36 @@ const writeNfc = async () => {
 }
 
 .status-ready {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background-color: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
 }
 
 .status-error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+}
+
+#nfc-icon-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 40px 0;
+}
+
+.nfc-main-icon {
+  font-size: 80px;
+  color: var(--ion-color-primary);
+  opacity: 0.7;
 }
 
 #container {
   text-align: center;
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
-  top: 60%;
-  transform: translateY(-50%);
+  bottom: 80px;
   padding: 20px;
 }
 
