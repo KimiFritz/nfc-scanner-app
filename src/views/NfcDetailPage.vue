@@ -109,6 +109,9 @@ interface TagData {
   isWritable: boolean;
   idBytes: number[];
   payloadBytes: number[];
+  techTypes: string[];
+  maxSize: number;
+    type: string;
   idHex: string;
   payloadHex: string;
   allBytesHex: string;
@@ -120,6 +123,9 @@ const tagData = ref<TagData>({
   isWritable: false,
   idBytes: [],
   payloadBytes: [],
+  techTypes: [],
+  maxSize: 0,
+   type: '',
   idHex: '',
   payloadHex: '',
   allBytesHex: ''
@@ -136,10 +142,14 @@ onMounted(() => {
       isWritable: route.params.isWritable === 'true',
       idBytes: JSON.parse(route.params.idBytes as string || '[]'),
       payloadBytes: JSON.parse(route.params.payloadBytes as string || '[]'),
+      techTypes: JSON.parse(route.params.techTypes as string || '[]'),
+      maxSize: parseInt(route.params.maxSize as string || '0'),
+      type: route.params.type as string || 'Unbekannt',
       idHex: '',
       payloadHex: '',
       allBytesHex: ''
     };
+
 
     // Hex-Darstellungen mit NfcUtils generieren
     if (tagData.value.idBytes.length > 0) {

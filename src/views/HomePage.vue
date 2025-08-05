@@ -253,7 +253,10 @@ const readNfc = async () => {
         idBytes: tag.id || [],
         payload: '',
         payloadBytes: [] as number[],
-        isWritable: tag.isWritable || false
+        isWritable: tag.isWritable || false,
+        techTypes: tag.techTypes || [],
+        maxSize: tag.maxSize || 0,
+        type: tag.type || 'Unbekannt'
       };
 
       // Payload aus NDEF-Records extrahieren (nur Text-Records)
@@ -286,7 +289,10 @@ const readNfc = async () => {
           payload: encodeURIComponent(tagData.payload),
           isWritable: tagData.isWritable.toString(),
           idBytes: JSON.stringify(tagData.idBytes),
-          payloadBytes: JSON.stringify(tagData.payloadBytes)
+          payloadBytes: JSON.stringify(tagData.payloadBytes),
+          techTypes: JSON.stringify(tagData.techTypes), // <-- techTypes hinzugefügt
+          maxSize: JSON.stringify(tagData.maxSize),
+          type: JSON.stringify(tagData.type)
         }
       });
     });
