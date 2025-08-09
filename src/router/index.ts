@@ -17,6 +17,12 @@ const routes: Array<RouteRecordRaw> = [
     path: '/nfc-detail/:id/:payload/:isWritable/:idBytes/:payloadBytes/:techTypes/:maxSize/:type',
     name: 'nfc-detail',
     component: NfcDetailPage
+  },
+  // Kompakte JSON-Variante (bevorzugt): Übergabe über Query ?tag=...
+  {
+    path: '/nfc-detail',
+    name: 'nfc-detail-json',
+    component: NfcDetailPage
   }
 ]
 

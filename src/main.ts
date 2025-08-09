@@ -3,6 +3,16 @@ import App from './App.vue'
 import router from './router';
 
 import { IonicVue } from '@ionic/vue';
+import { addIcons } from 'ionicons';
+import {
+  clipboardOutline,
+  shareOutline,
+  checkmarkCircleOutline,
+  closeCircleOutline,
+  scanOutline,
+  createOutline,
+  radioOutline,
+} from 'ionicons/icons';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/vue/css/core.css';
@@ -33,6 +43,17 @@ import '@ionic/vue/css/palettes/dark.system.css';
 
 /* Theme variables */
 import './theme/variables.css';
+
+// Ionicons einmalig registrieren, damit <ion-icon name="…"> überall funktioniert
+addIcons({
+  'clipboard-outline': clipboardOutline,
+  'share-outline': shareOutline,
+  'checkmark-circle-outline': checkmarkCircleOutline,
+  'close-circle-outline': closeCircleOutline,
+  'scan-outline': scanOutline,
+  'create-outline': createOutline,
+  'radio-outline': radioOutline,
+});
 
 const app = createApp(App)
   .use(IonicVue)

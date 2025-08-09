@@ -2,180 +2,123 @@
   <ion-page>
     <ion-header :translucent="true">
       <ion-toolbar>
-        <ion-title>NFC-Scanner-App</ion-title>
+  <ion-title>NFC Scanner-App</ion-title>
+  <!-- NFC support icon in the toolbar -->
+  <ion-button v-if="isSupported !== null" id="support-icon" slot="end" fill="clear" aria-label="NFC support">
+          <ion-icon :name="getSupportIconName()" :class="['support-icon', supportClass]"></ion-icon>
+        </ion-button>
       </ion-toolbar>
     </ion-header>
 
     <ion-content :fullscreen="true">
       <ion-header collapse="condense">
         <ion-toolbar>
-          <ion-title size="large">NFC-Scanner-App</ion-title>
+          <ion-title size="large">NFC Scanner-App</ion-title>
         </ion-toolbar>
       </ion-header>
 
-      <!-- NFC Status Anzeige -->
-      <div id="status-container">
-        <div :class="['status-card', `status-${nfcStatus}`]">
-          <ion-icon 
-            :icon="getStatusIcon()" 
-            :class="['status-icon', `status-icon-${nfcStatus}`]"
-          ></ion-icon>
-          <p class="status-message">{{ statusMessage }}</p>
+      <!-- Intro section -->
+      <div class="intro">
+        <ion-icon name="radio-outline" class="intro-icon" aria-hidden="true"></ion-icon>
+        <div class="intro-text">Read & write NFC tags</div>
+      </div>
+
+      <!-- Popover for NFC support information -->
+      <ion-popover v-if="isSupported !== null" trigger="support-icon" trigger-action="click hover">
+        <div class="popover-content" :class="supportClass">
+          {{ supportMessage }}
         </div>
-      </div>
+      </ion-popover>
 
-      <!-- NFC Icon in der Mitte -->
-      <div id="nfc-icon-container">
-        <ion-icon :icon="radioOutline" class="nfc-main-icon"></ion-icon>
-      </div>
-
-      <!-- Buttons to read and write NFC tags -->
-      <div id="container">
-        <ion-button 
-          expand="block" 
-          @click="readNfc"
-          :disabled="!isNfcReady"
-        >
-          <ion-icon :icon="scanOutline" slot="start"></ion-icon>
-          Lesen
+      <!-- Actions -->
+      <div class="actions">
+        <ion-button expand="block" @click="readNfc" :disabled="!isSupported || isBusy">
+          <ion-icon name="scan-outline" slot="start"></ion-icon>
+          Read
         </ion-button>
-        <ion-button 
-          expand="block" 
-          @click="writeNfc"
-          :disabled="!isNfcReady"
-        >
-          <ion-icon :icon="createOutline" slot="start"></ion-icon>
-          Schreiben
+        <ion-button expand="block" @click="writeNfc" :disabled="!isSupported || isBusy">
+          <ion-icon name="create-outline" slot="start"></ion-icon>
+          Write
+        </ion-button>
+        <ion-button v-if="isDev" expand="block" color="medium" @click="openNfcDetailDemo">
+          Open detail demo
         </ion-button>
       </div>
+    
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonIcon } from '@ionic/vue';
-import { scanOutline, createOutline, radioOutline, checkmarkCircleOutline, alertCircleOutline, timeOutline, settingsOutline } from 'ionicons/icons';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonIcon, IonPopover } from '@ionic/vue';
 import { Nfc, NfcUtils } from '@capawesome-team/capacitor-nfc';
-import { alertController } from '@ionic/vue';
+import { alertController, toastController } from '@ionic/vue';
 import { Capacitor } from '@capacitor/core';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-// Reactive state für NFC-Status
-const nfcStatus = ref<'checking' | 'ready' | 'error'>('checking');
-const statusMessage = ref('NFC wird geprüft...');
-const isNfcReady = ref(false);
+// App support status + busy flag
+const isSupported = ref<boolean | null>(null); // null = checking
+const isBusy = ref(false);
 
-// Status Icon bestimmen
-const getStatusIcon = () => {
-  switch (nfcStatus.value) {
-    case 'checking': return timeOutline;
-    case 'ready': return checkmarkCircleOutline;
-    case 'error': return alertCircleOutline;
-    default: return timeOutline;
-  }
-};
+// Icon to visualize NFC support status
+const getSupportIconName = () => (isSupported.value ? 'checkmark-circle-outline' : 'close-circle-outline');
 
-// App-Start: Nur grundlegende NFC-Verfügbarkeit prüfen
+const supportClass = computed(() => (isSupported.value ? 'supported' : 'unsupported'));
+
+// Status message used inside the popover
+const supportMessage = computed(() => (isSupported.value ? 'This device supports NFC.' : 'This device does not support NFC.'));
+
+// On app start: check if device supports NFC (capability only)
 onMounted(async () => {
-  await checkNfcAvailability();
+  await checkDeviceSupport();
 });
 
-const checkNfcAvailability = async () => {
+/**
+ * Check basic NFC capability of the device (no permission/enabled checks here).
+ */
+const checkDeviceSupport = async () => {
   try {
-    nfcStatus.value = 'checking';
-    statusMessage.value = 'NFC wird geprüft...';
-
-    // 1. NFC-Support prüfen
-    const { isSupported } = await Nfc.isSupported();
-    if (!isSupported) {
-      nfcStatus.value = 'error';
-      statusMessage.value = 'NFC wird nicht unterstützt';
-      return;
-    }
-
-    // 2. NFC-Aktivierung prüfen (nur Android)
-    if (Capacitor.getPlatform() === 'android') {
-      const { isEnabled } = await Nfc.isEnabled();
-      if (!isEnabled) {
-        nfcStatus.value = 'error';
-        statusMessage.value = 'NFC ist deaktiviert';
-        await showNfcDeactivationDialog();
-        return;
-      }
-    }
-
-    // 3. NFC ist verfügbar und aktiviert
-    nfcStatus.value = 'ready';
-    statusMessage.value = 'NFC ist bereit';
-    isNfcReady.value = true;
-
+    const { isSupported: supported } = await Nfc.isSupported();
+  isSupported.value = !!supported;
   } catch (error) {
-    console.error('Fehler bei NFC-Prüfung:', error);
-    nfcStatus.value = 'error';
-    statusMessage.value = 'Fehler bei der NFC-Prüfung';
+   console.error('Error checking NFC support:', error);
+  isSupported.value = false;
   }
 };
 
-const showNfcDeactivationDialog = async () => {
+/**
+ * Generic alert helper that presents an alert and returns it.
+ */
+const presentAlert = async (opts: Parameters<typeof alertController.create>[0]) => {
+  const alert = await alertController.create(opts);
+  await alert.present();
+  return alert;
+};
+
+/** Present a simple error alert. */
+const showErrorDialog = async (header: string, message: string) => {
   const alert = await alertController.create({
-    header: 'NFC aktivieren',
-    message: 'NFC ist auf diesem Gerät deaktiviert. Bitte aktivieren Sie NFC in den Einstellungen, um die App verwenden zu können.',
-    buttons: [
-      { 
-        text: 'Abbrechen', 
-        role: 'cancel',
-        handler: () => {
-          nfcStatus.value = 'error';
-          statusMessage.value = 'NFC ist deaktiviert';
-        }
-      },
-      { 
-        text: 'Einstellungen öffnen', 
-        handler: async () => {
-          await Nfc.openSettings();
-          // Nach dem Öffnen der Einstellungen erneut prüfen
-          setTimeout(() => checkNfcAvailability(), 1000);
-        }
-      }
-    ]
+    header,
+    message,
+    buttons: ['OK']
   });
   await alert.present();
 };
 
-const checkPermissionsAndRequest = async (): Promise<boolean> => {
-  try {
-    // Berechtigungen prüfen
-    const { nfc } = await Nfc.checkPermissions();
-    
-    if (nfc !== 'granted') {
-      // Berechtigung anfordern
-      const { nfc: requestedPermission } = await Nfc.requestPermissions();
-      
-      if (requestedPermission !== 'granted') {
-        await showPermissionDialog();
-        return false;
-      }
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Fehler bei Berechtigungsprüfung:', error);
-    await showErrorDialog('Berechtigungsfehler', `Fehler: ${(error as Error).message}`);
-    return false;
-  }
-};
-
+/**
+ * Explain why NFC permission is needed and allow opening settings (Android).
+ */
 const showPermissionDialog = async () => {
   const alert = await alertController.create({
-    header: 'NFC-Berechtigung erforderlich',
-    message: 'Diese App benötigt NFC-Berechtigung zum Lesen und Schreiben von Tags.',
+    header: 'NFC permission required',
+    message: 'This app needs NFC permission to read and write tags.',
     buttons: [
-      { text: 'Abbrechen', role: 'cancel' },
+      { text: 'Cancel', role: 'cancel' },
       { 
-        text: 'Einstellungen öffnen', 
+        text: 'Open settings', 
         handler: async () => {
           if (Capacitor.getPlatform() === 'android') {
             await Nfc.openSettings();
@@ -187,333 +130,256 @@ const showPermissionDialog = async () => {
   await alert.present();
 };
 
-const showErrorDialog = async (header: string, message: string) => {
+/**
+ * Ask the user to enable NFC in Android settings when it is disabled.
+ */
+const showNfcDeactivationDialog = async () => {
   const alert = await alertController.create({
-    header,
-    message,
-    buttons: ['OK']
-  });
-  await alert.present();
-};
-
-// NFC-Lesefunktion mit Berechtigungsprüfung
-const readNfc = async () => {
-  // Erst Berechtigungen prüfen
-  const hasPermission = await checkPermissionsAndRequest();
-  if (!hasPermission) return;
-
-  let scanAlert: any = null;
-  let tagListener: any = null;
-  let errorListener: any = null;
-  let cancelListener: any = null;
-
-  // Zentrale Cleanup-Funktion
-  const cleanup = async () => {
-    try {
-      await Nfc.stopScanSession();
-      await scanAlert?.dismiss();
-      tagListener?.remove();
-      errorListener?.remove();
-      cancelListener?.remove();
-    } catch (error) {
-      console.error('Fehler beim Cleanup:', error);
-    }
-  };
-
-  try {
-    // Alte Listener entfernen
-    await Nfc.removeAllListeners();
-
-    // Scan-Dialog erstellen
-    scanAlert = await alertController.create({
-      header: 'NFC-Tag scannen',
-      message: 'Halten Sie ein NFC-Tag an das Gerät',
-      backdropDismiss: false,
-      buttons: [
-        {
-          text: 'Abbrechen',
-          role: 'cancel',
-          handler: cleanup
-        }
-      ]
-    });
-
-    await scanAlert.present();
-
-    // Tag-Listener
-    tagListener = await Nfc.addListener('nfcTagScanned', async (event) => {
-      await cleanup();
-
-      const tag = event.nfcTag;
-      const utils = new NfcUtils();
-      
-      // Tag-Daten extrahieren
-      const tagData = {
-        id: tag.id ? utils.convertBytesToHex({ bytes: tag.id }).hex : 'Unbekannt',
-        idBytes: tag.id || [],
-        payload: '',
-        payloadBytes: [] as number[],
-        isWritable: tag.isWritable || false,
-        techTypes: tag.techTypes || [],
-        maxSize: tag.maxSize || 0,
-        type: tag.type || 'Unbekannt'
-      };
-
-      // Payload aus NDEF-Records extrahieren (nur Text-Records)
-      if (tag.message?.records && tag.message.records.length > 0) {
-        const firstRecord = tag.message.records[0];
-        if (firstRecord.payload) {
-          tagData.payloadBytes = firstRecord.payload;
-          
-          // Versuche Text aus NDEF Text Record zu extrahieren
-          try {
-            const { text } = utils.getTextFromNdefTextRecord({ record: firstRecord });
-            if (text) {
-              tagData.payload = text;
-            } else {
-              // Fallback: Bytes als String interpretieren
-              tagData.payload = utils.convertBytesToString({ bytes: firstRecord.payload }).text;
-            }
-          } catch {
-            // Fallback: Bytes als String interpretieren
-            tagData.payload = utils.convertBytesToString({ bytes: firstRecord.payload }).text;
-          }
-        }
-      }
-
-      // Zur Detailseite navigieren
-      router.push({
-        name: 'nfc-detail',
-        params: {
-          id: tagData.id,
-          payload: encodeURIComponent(tagData.payload),
-          isWritable: tagData.isWritable.toString(),
-          idBytes: JSON.stringify(tagData.idBytes),
-          payloadBytes: JSON.stringify(tagData.payloadBytes),
-          techTypes: JSON.stringify(tagData.techTypes), // <-- techTypes hinzugefügt
-          maxSize: JSON.stringify(tagData.maxSize),
-          type: JSON.stringify(tagData.type)
-        }
-      });
-    });
-
-    // Error-Listener
-    errorListener = await Nfc.addListener('scanSessionError', async (event) => {
-      await cleanup();
-      
-      const errorAlert = await alertController.create({
-        header: 'Scan-Fehler',
-        message: event.message || 'Fehler beim Scannen des NFC-Tags.',
-        buttons: ['OK']
-      });
-      await errorAlert.present();
-    });
-
-    // Cancel-Listener für iOS
-    cancelListener = await Nfc.addListener('scanSessionCanceled', cleanup);
-
-    // Scan-Session starten
-    await Nfc.startScanSession({
-      alertMessage: 'NFC-Tag an das Gerät halten'
-    });
-
-  } catch (error) {
-    await cleanup();
-    
-    console.error('Fehler beim NFC-Scan:', error);
-    const errorAlert = await alertController.create({
-      header: 'Fehler',
-      message: 'Ein Fehler ist beim NFC-Scan aufgetreten.',
-      buttons: ['OK']
-    });
-    await errorAlert.present();
-  }
-};
-
-const write = async (text: string) => {
-  const utils = new NfcUtils();
-  const { record } = utils.createNdefTextRecord({ text });
-
-  return new Promise<void>(async (resolve, reject) => {
-    let cancelled = false;
-
-    const writingAlert = await alertController.create({
-      header: 'Warte auf NFC-Tag...',
-      message: 'Halte das NFC-Tag an das Gerät, um den Text zu schreiben.',
-      buttons: [
-        {
-          text: 'Abbrechen',
-          role: 'cancel',
-          handler: async () => {
-            cancelled = true;
-            await Nfc.stopScanSession();
-            resolve();
-          }
-        }
-      ],
-      backdropDismiss: false,
-    });
-    await writingAlert.present();
-
-    await Nfc.removeAllListeners();
-
-    const listener = await Nfc.addListener('nfcTagScanned', async () => {
-      if (cancelled) return;
-
-      try {
-        await Nfc.write({ message: { records: [record] } });
-        await Nfc.stopScanSession();
-        await writingAlert.dismiss();
-
-        const successAlert = await alertController.create({
-          header: 'Erfolg',
-          message: 'Der Text wurde auf das NFC-Tag geschrieben.',
-          buttons: ['OK']
-        });
-        await successAlert.present();
-
-        resolve();
-      } catch (error) {
-        await writingAlert.dismiss();
-
-        const errorAlert = await alertController.create({
-          header: 'Fehler',
-          message: 'Fehler beim Schreiben auf das NFC-Tag.',
-          buttons: ['OK']
-        });
-        await errorAlert.present();
-
-        reject(error);
-      }
-    });
-
-    await Nfc.startScanSession({ alertMessage: 'Halte das NFC-Tag zum Schreiben an das Gerät.' });
-  });
-};
-
-const writeNfc = async () => {
-  // Erst Berechtigungen prüfen
-  const hasPermission = await checkPermissionsAndRequest();
-  if (!hasPermission) return;
-
-  const alert = await alertController.create({
-    header: 'NFC-Tag beschreiben',
-    message: 'Bitte gib den Text ein, der auf das NFC-Tag geschrieben werden soll:',
-    inputs: [
-      {
-        name: 'nfcText',
-        type: 'text',
-        placeholder: 'Text für NFC-Tag',
-      }
-    ],
+    header: 'Enable NFC',
+    message: 'NFC is disabled on this device. Please enable it in Settings to use this app.',
     buttons: [
-      {
-        text: 'Abbrechen',
+      { 
+        text: 'Cancel', 
         role: 'cancel',
+  handler: () => {}
       },
-      {
-        text: 'OK',
-        handler: async (data: { nfcText: string }) => {
-          if (data.nfcText && data.nfcText.trim().length > 0) {
-            // Kleiner Delay, damit der Alert sauber schließt
-            setTimeout(() => write(data.nfcText), 300);
-          }
+      { 
+        text: 'Open settings', 
+        handler: async () => {
+          await Nfc.openSettings();
+          // Optional: re-check base support (isEnabled is checked on action)
+          setTimeout(() => checkDeviceSupport(), 1000);
         }
       }
     ]
   });
   await alert.present();
 };
+
+
+/**
+ * Ensure NFC is enabled (Android) and the permission is granted.
+ * Only called on user actions (read/write), not on app start.
+ */
+const ensureEnabledAndPermission = async (): Promise<void> => {
+  // Use cached status; if unknown, perform a single check
+  if (isSupported.value === null) {
+    await checkDeviceSupport();
+  }
+  if (!isSupported.value) {
+   await showErrorDialog('Not supported', 'This device does not support NFC.');
+    throw new Error('unsupported');
+  }
+
+  if (Capacitor.getPlatform() === 'android') {
+    const { isEnabled } = await Nfc.isEnabled();
+    if (!isEnabled) {
+      await showNfcDeactivationDialog();
+      throw new Error('disabled');
+    }
+  }
+
+  // Funktion eigentlich nur für Web notwendig (siehe Dokumentation)
+  const { nfc } = await Nfc.checkPermissions();
+  if (nfc !== 'granted') {
+    const { nfc: requestedPermission } = await Nfc.requestPermissions();
+    if (requestedPermission !== 'granted') {
+  await showPermissionDialog();
+      throw new Error('permission-denied');
+    }
+  }
+};
+
+/**
+ * Start an NFC scan session and wait for a tag.
+ * Provides a cancel alert and ensures proper cleanup of listeners/session.
+ */
+const waitForTag = async (header = 'NFC', message = 'Hold an NFC tag near the device') => {
+  const blocker = await presentAlert({
+    header,
+    message,
+    backdropDismiss: false,
+  buttons: [{ text: 'Cancel', role: 'cancel' }]
+  });
+
+  const subs: Array<{ remove: () => Promise<void> }> = [];
+  try {
+    await Nfc.removeAllListeners();
+
+    const tagP = new Promise<any>((resolve, reject) => {
+      Nfc.addListener('nfcTagScanned', (e) => resolve(e.nfcTag)).then(s => subs.push(s));
+    Nfc.addListener('scanSessionError', (e) => reject(new Error(e?.message || 'Scan error'))).then(s => subs.push(s));
+    });
+
+    const cancelP = new Promise<never>((_, reject) => {
+      blocker.onDidDismiss().then((detail) => {
+        if (detail.role === 'cancel') {
+      // Stop session and reject
+          Nfc.stopScanSession().finally(() => reject(new Error('cancelled')));
+        }
+      });
+    });
+
+    await Nfc.startScanSession();
+    return await Promise.race([tagP, cancelP]);
+  } finally {
+    try { await Nfc.stopScanSession(); } catch {}
+    await Promise.allSettled(subs.map(s => s.remove()));
+    await blocker.dismiss();
+  }
+};
+
+/**
+ * Normalize the raw tag data to a compact object used for navigation.
+ */
+const utils = new NfcUtils();
+const normalizeTag = (tag: any) => {
+  const id = tag?.id ? utils.convertBytesToHex({ bytes: tag.id }).hex : 'Unknown';
+  let payload = '';
+  const rec = tag?.message?.records?.[0];
+  if (rec?.payload) {
+    try {
+      const { text } = utils.getTextFromNdefTextRecord({ record: rec });
+      payload = text || utils.convertBytesToString({ bytes: rec.payload }).text;
+    } catch {
+      payload = utils.convertBytesToString({ bytes: rec.payload }).text;
+    }
+  }
+  return {
+    id,
+    payload,
+    isWritable: !!tag?.isWritable,
+    idBytes: tag?.id || [],
+    payloadBytes: rec?.payload || [],
+    techTypes: tag?.techTypes || [],
+    maxSize: tag?.maxSize || 0,
+    type: tag?.type || 'Unknown'
+  };
+};
+
+
+/** Read an NFC tag and navigate to the detail page. */
+const readNfc = async () => {
+  if (!isSupported.value || isBusy.value) return;
+  isBusy.value = true;
+  try {
+    await ensureEnabledAndPermission();
+    const tag = await waitForTag('Scan NFC tag', 'Hold the NFC tag near the device');
+    const tagData = normalizeTag(tag);
+    router.push({ name: 'nfc-detail-json', query: { tag: JSON.stringify(tagData) } });
+  } catch (error) {
+    const t = await toastController.create({
+      message: 'Error reading the NFC tag',
+      duration: 2000,
+      position: 'bottom',
+      color: 'danger'
+    });
+    await t.present();
+  } finally {
+    isBusy.value = false;
+  }
+};
+
+/** Prompt for text and write it to an NFC tag. */
+const writeNfc = async () => {
+  if (!isSupported.value || isBusy.value) return;
+  isBusy.value = true;
+  try {
+    await ensureEnabledAndPermission();
+
+    const ask = await presentAlert({
+      header: 'Write NFC tag',
+      message: 'Please enter the text to write to the NFC tag:',
+      inputs: [{ name: 'nfcText', type: 'text', placeholder: 'Text for NFC tag' }],
+      buttons: [{ text: 'Cancel', role: 'cancel' }, { text: 'OK', role: 'confirm' }]
+    });
+    const { data, role } = await ask.onDidDismiss();
+    const text: string | undefined = data?.values?.nfcText?.trim();
+    if (role !== 'confirm' || !text) return;
+
+    const { record } = utils.createNdefTextRecord({ text });
+    await waitForTag('Waiting for NFC tag…', 'Hold the NFC tag near the device to write the text.');
+    await Nfc.write({ message: { records: [record] } });
+
+    await presentAlert({ header: 'Success', message: 'Text has been written to the NFC tag.', buttons: ['OK'] });
+  } catch (error) {
+    const t = await toastController.create({
+      message: 'Error writing to the NFC tag',
+      duration: 2000,
+      position: 'bottom',
+      color: 'danger'
+    });
+    await t.present();
+  } finally {
+    isBusy.value = false;
+  }
+};
+
+const isDev = import.meta.env.DEV;
+
+/** Navigate to the detail page with mock data (dev only). */
+const openNfcDetailDemo = () => {
+  const id = '01020304';
+  const payload = 'Hello NFC';
+  const isWritable = false;
+  const idBytes = [1, 2, 3, 4];
+  const payloadBytes = [72, 101, 108, 108, 111, 32, 78, 70, 67]; // "Hello NFC"
+  const techTypes: string[] = [];
+  const maxSize = 0;
+  const type = 'Unknown';
+
+  router.push({ name: 'nfc-detail-json', query: { tag: JSON.stringify({
+    id,
+    payload,
+    isWritable,
+    idBytes,
+    payloadBytes,
+    techTypes,
+    maxSize,
+    type
+  }) } });
+};
 </script>
 
 
 <style scoped>
-#status-container {
-  text-align: center;
-  padding: 16px;
-  margin-top: 20px;
+.support-icon { font-size: 25px; }
+.support-icon.supported { color: #2e7d32; }
+.support-icon.unsupported { color: #d32f2f; }
+
+.popover-content {
+  padding: 10px 12px;
+  font-size: 14px;
+  min-width: 220px;
 }
 
-.status-card {
+.popover-content.supported { color: #2e7d32; }
+.popover-content.unsupported { color: #d32f2f; }
+
+.intro {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 20px;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-  max-width: 300px;
-  margin: 0 auto;
-}
-
-.status-icon {
-  font-size: 32px;
-  margin-bottom: 8px;
-}
-
-.status-icon-checking {
-  color: #1565c0;
-}
-
-.status-icon-ready {
-  color: #2e7d32;
-}
-
-.status-icon-error {
-  color: #d32f2f;
-}
-
-.status-message {
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0;
-  text-align: center;
-}
-
-.status-checking {
-  background-color: #e3f2fd;
-  color: #1565c0;
-  border: 1px solid #bbdefb;
-}
-
-.status-ready {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-}
-
-.status-error {
-  background-color: #ffebee;
-  color: #d32f2f;
-  border: 1px solid #ffcdd2;
-}
-
-#nfc-icon-container {
-  display: flex;
   justify-content: center;
-  align-items: center;
-  margin: 40px 0;
+  padding: 24px 0 8px;
 }
 
-.nfc-main-icon {
-  font-size: 80px;
+.intro-icon {
+  font-size: 72px;
   color: var(--ion-color-primary);
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
-#container {
-  text-align: center;
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 80px;
-  padding: 20px;
+.intro-text {
+  margin-top: 6px;
+  color: var(--ion-color-dark);
+  font-size: 16px;
 }
 
-#container ion-button {
-  margin: 10px 0;
-}
-
-#container ion-button[disabled] {
-  opacity: 0.4;
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
 }
 </style>
