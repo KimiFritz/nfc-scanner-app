@@ -321,7 +321,7 @@ const isDev = import.meta.env.DEV;
 const openNfcDetailDemo = () => {
   const id = '01020304';
   const payload = 'Hello NFC';
-  const isWritable = false;
+  const isWritable = true;
   const idBytes = [1, 2, 3, 4];
   const payloadBytes = [72, 101, 108, 108, 111, 32, 78, 70, 67]; // "Hello NFC"
   const techTypes: string[] = [];
