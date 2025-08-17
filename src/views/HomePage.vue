@@ -1,6 +1,6 @@
 <template>
   <ion-page>
-    <ion-header :translucent="true">
+    <ion-header>
       <ion-toolbar>
   <ion-title>NFC Scanner-App</ion-title>
   <!-- NFC support icon in the toolbar -->
