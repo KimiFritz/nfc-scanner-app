@@ -32,6 +32,9 @@ Dieses Repository enthält die im 6. Semester des Moduls „Fallstudie“ an der
 
 ## Abgabe
 
+- **Präsentation (PowerPoint):** [abgabe/praesentation.pptx](./abgabe/praesentation.pptx)  
+  *(Präsentation der App am 25.08.2025)*  
+
 - **Präsentation (PDF):** [abgabe/praesentation.pdf](./abgabe/praesentation.pdf)  
   *(Präsentation der App am 25.08.2025)*  
 
